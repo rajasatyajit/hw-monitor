@@ -49,16 +49,19 @@ const (
 	bgPurple    = "\033[45m"
 	bgCyan      = "\033[46m"
 	bgWhite     = "\033[47m"
+	cpuColor    = "\033[44;37m" // Blue background with white text
+	memColor    = "\033[42;37m" // Green background with white text
+	diskColor   = "\033[46;37m" // Cyan background with white text
+	netColor    = "\033[43;37m" // Yellow background with white text
+	sysColor    = "\033[45;37m" // Purple background with white text
+	gpuColor    = "\033[41;37m" // Red background with white text
 )
 
 func main() {
 	for {
 		currentStatus := getHardwareStatus()
-
 		displayStatus(currentStatus)
-
 		previousStatus = currentStatus
-
 		time.Sleep(500 * time.Millisecond)
 	}
 }
@@ -115,77 +118,88 @@ func getGPUStatus() []GPUStatus {
 }
 
 func displayStatus(status HardwareStatus) {
-	fmt.Print("\033[H\033[2J") // Clear the terminal
-	fmt.Print("\033[0;0H")     // Move cursor to the top left corner
+	clearScreen()
+	drawTableTopLine()
+	drawTableHeader()
 
-	fmt.Println("Hardware Status:")
-	displayCPUUsage(status.CPUUsage)
-	displayMemUsage(status.MemUsage)
-	displayDiskUsage(status.DiskUsage)
-	displayNetIO(status.NetIO)
-	displayUptime(status.Uptime)
-	displayGPUStatus(status.GPUStatus)
-}
-
-func displayCPUUsage(cpuUsage []float64) {
-	for i, usage := range cpuUsage {
-		color := getColor(previousStatus.CPUUsage != nil && previousStatus.CPUUsage[i] != usage)
-		fmt.Printf("%sCPU Core %d Usage: %0.2f%%%s\n", color, i, usage, colorReset)
+	for i, usage := range status.CPUUsage {
+		color := getColor(previousStatus.CPUUsage != nil && previousStatus.CPUUsage[i] != usage, cpuColor)
+		drawTableRow("CPU", fmt.Sprintf("Core %d Usage", i), fmt.Sprintf("%s%.2f%%%s", color, usage, colorReset))
 	}
-}
 
-func displayMemUsage(memUsage *mem.VirtualMemoryStat) {
-	color := getColor(previousStatus.MemUsage != nil && previousStatus.MemUsage.UsedPercent != memUsage.UsedPercent)
-	fmt.Printf("%sMemory Usage: %0.2f%%%s\n", color, memUsage.UsedPercent, colorReset)
-}
+	color := getColor(previousStatus.MemUsage != nil && previousStatus.MemUsage.UsedPercent != status.MemUsage.UsedPercent, memColor)
+	drawTableRow("Memory", "Usage", fmt.Sprintf("%s%.2f%%%s", color, status.MemUsage.UsedPercent, colorReset))
 
-func displayDiskUsage(diskUsage []disk.UsageStat) {
-	for _, usage := range diskUsage {
+	for _, usage := range status.DiskUsage {
 		var prevUsagePercent float64
 		for _, prevUsage := range previousStatus.DiskUsage {
 			if prevUsage.Path == usage.Path {
 				prevUsagePercent = prevUsage.UsedPercent
 			}
 		}
-		color := getColor(prevUsagePercent != usage.UsedPercent)
-		fmt.Printf("%sDisk (%s) Usage: %0.2f%%%s\n", color, usage.Path, usage.UsedPercent, colorReset)
+		color := getColor(prevUsagePercent != usage.UsedPercent, diskColor)
+		drawTableRow("Disk", fmt.Sprintf("Usage (%s)", usage.Path), fmt.Sprintf("%s%.2f%%%s", color, usage.UsedPercent, colorReset))
 	}
-}
 
-func displayNetIO(netIO []net.IOCountersStat) {
-	for _, io := range netIO {
+	for _, io := range status.NetIO {
 		var prevIO net.IOCountersStat
 		for _, prev := range previousStatus.NetIO {
 			if prev.Name == io.Name {
 				prevIO = prev
 			}
 		}
-		colorSent := getColor(prevIO.BytesSent != io.BytesSent)
-		colorRecv := getColor(prevIO.BytesRecv != io.BytesRecv)
-		fmt.Printf("%sNet IO (%s) - Bytes Sent: %d%s, %sBytes Received: %d%s\n", colorSent, io.Name, io.BytesSent, colorReset, colorRecv, io.BytesRecv, colorReset)
+		colorSent := getColor(prevIO.BytesSent != io.BytesSent, netColor)
+		colorRecv := getColor(prevIO.BytesRecv != io.BytesRecv, netColor)
+		drawTableRow("Network", fmt.Sprintf("Bytes Sent (%s)", io.Name), fmt.Sprintf("%s%d bytes%s", colorSent, io.BytesSent, colorReset))
+		drawTableRow("Network", fmt.Sprintf("Bytes Received (%s)", io.Name), fmt.Sprintf("%s%d bytes%s", colorRecv, io.BytesRecv, colorReset))
 	}
-}
 
-func displayUptime(uptime uint64) {
-	color := getColor(previousStatus.Uptime != uptime)
-	fmt.Printf("%sSystem Uptime: %d seconds%s\n", color, uptime, colorReset)
-}
+	color = getColor(previousStatus.Uptime != status.Uptime, sysColor)
+	drawTableRow("System", "Uptime", fmt.Sprintf("%s%d seconds%s", color, status.Uptime, colorReset))
 
-func displayGPUStatus(gpuStatus []GPUStatus) {
-	for i, status := range gpuStatus {
-		var prevStatus GPUStatus
+	for i, gpu := range status.GPUStatus {
+		var prevGPU GPUStatus
 		if previousStatus.GPUStatus != nil && len(previousStatus.GPUStatus) > i {
-			prevStatus = previousStatus.GPUStatus[i]
+			prevGPU = previousStatus.GPUStatus[i]
 		}
-		colorUtilization := getColor(prevStatus.Utilization != status.Utilization)
-		colorMemory := getColor(prevStatus.MemoryUsage != status.MemoryUsage)
-		fmt.Printf("%sGPU %s - Utilization: %s%s, %sMemory Usage: %s%s\n", colorUtilization, status.Name, status.Utilization, colorReset, colorMemory, status.MemoryUsage, colorReset)
+		colorUtilization := getColor(prevGPU.Utilization != gpu.Utilization, gpuColor)
+		colorMemory := getColor(prevGPU.MemoryUsage != gpu.MemoryUsage, gpuColor)
+		drawTableRow("GPU", fmt.Sprintf("Utilization (%s)", gpu.Name), fmt.Sprintf("%s%s%s", colorUtilization, gpu.Utilization, colorReset))
+		drawTableRow("GPU", fmt.Sprintf("Memory Usage (%s)", gpu.Name), fmt.Sprintf("%s%s%s", colorMemory, gpu.MemoryUsage, colorReset))
 	}
+
+	drawTableBottomLine()
 }
 
-func getColor(changed bool) string {
+func clearScreen() {
+	fmt.Print("\033[H\033[2J")
+	fmt.Print("\033[0;0H")
+}
+
+func drawTableTopLine() {
+	fmt.Println("┌──────────────────────┬────────────────────────────────────────────────────┬────────────────────┐")
+}
+
+func drawTableHeader() {
+	fmt.Println("│ Component            │ Metric                                             │ Value              │")
+	drawTableMidLine()
+}
+
+func drawTableMidLine() {
+	fmt.Println("├──────────────────────┼────────────────────────────────────────────────────┼────────────────────┤")
+}
+
+func drawTableBottomLine() {
+	fmt.Println("└──────────────────────┴────────────────────────────────────────────────────┴────────────────────┘")
+}
+
+func drawTableRow(component, metric, value string) {
+	fmt.Printf("│ %-20s │ %-50s │ %-30s │\n", component, metric, value)
+}
+
+func getColor(changed bool, baseColor string) string {
 	if changed {
-		return bgRed + colorWhite // Red background with white text for updates
+		return bgWhite + colorRed // White background with red text for updates
 	}
-	return colorReset // Default color
+	return baseColor // Base color for each component type
 }

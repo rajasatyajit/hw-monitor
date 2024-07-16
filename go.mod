@@ -2,9 +2,7 @@ module hw-monitor
 
 go 1.22.4
 
-require (
-	github.com/shirou/gopsutil/v4 v4.24.6
-)
+require github.com/shirou/gopsutil/v4 v4.24.6
 
 require (
 	github.com/go-ole/go-ole v1.2.6 // indirect
