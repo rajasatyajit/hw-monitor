@@ -17,22 +17,21 @@ This is a Go project that monitors and displays hardware status for a laptop. Th
 
 ## Installation
 
-## 1. Clone the repository:
-```bash
+## Clone the repository:
+```sh
    git clone https://github.com/rajasatyajit/hw-monitor.git
    cd hw-monitor
-   ```
+```
  
-## 2. Initialize the Go module:
-```bash
+## Initialize the Go module
+```sh
     go mod init hardware-monitor
-    ```
-    
-## Install dependencies:
+```
 
-```bash
+## Install dependencies
+```sh
     go get -u github.com/shirou/gopsutil/v4
-    ```
+```
 
 ## Usage
 
@@ -42,9 +41,9 @@ This is a Go project that monitors and displays hardware status for a laptop. Th
 
     Run the project:
 
-```bash
+```sh
     go run main.go
-    ```
+```
 
 ## How It Works
 
@@ -61,10 +60,10 @@ This is a Go project that monitors and displays hardware status for a laptop. Th
 ## License
 This project is licensed under the MIT License. See the LICENSE file for details.
 
-##Contributing
+## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request.
-##Acknowledgements
+## Acknowledgements
 
     This project uses the gopsutil library for hardware monitoring.
     This project uses the nvidia-smi tool for GPU monitoring.
