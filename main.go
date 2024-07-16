@@ -1,9 +1,16 @@
 package main
 
+/*
+#cgo CFLAGS: -IC:\\PROGRA~1\\NVIDIA~2\\CUDA\\v12.5\\include
+#cgo LDFLAGS: -LC:\\PROGRA~1\\NVIDIA~2\\CUDA\\v12.5\\lib\\x64 -lnvidia-ml
+*/
+
 import (
 	"fmt"
+	"log"
 	"time"
 
+	"github.com/rajasatyajit/hw-monitor/nvml"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/host"
@@ -17,6 +24,13 @@ type HardwareStatus struct {
 	DiskUsage []disk.UsageStat
 	NetIO     []net.IOCountersStat
 	Uptime    uint64
+	GPUStatus []GPUStatus
+}
+
+type GPUStatus struct {
+	Name        string
+	Utilization uint
+	MemoryUsage uint64
 }
 
 var previousStatus HardwareStatus
@@ -40,6 +54,12 @@ const (
 )
 
 func main() {
+	err := nvml.Initialize()
+	if err != nil {
+		log.Fatalf("Could not initialize NVML: %v", err)
+	}
+	defer nvml.Shutdown()
+
 	for {
 		currentStatus := getHardwareStatus()
 
@@ -62,6 +82,7 @@ func getHardwareStatus() HardwareStatus {
 	}
 	netIO, _ := net.IOCounters(true)
 	uptime, _ := host.Uptime()
+	gpuStatus := getGPUStatus()
 
 	return HardwareStatus{
 		CPUUsage:  cpuUsage,
@@ -69,7 +90,25 @@ func getHardwareStatus() HardwareStatus {
 		DiskUsage: diskUsages,
 		NetIO:     netIO,
 		Uptime:    uptime,
+		GPUStatus: gpuStatus,
 	}
+}
+
+func getGPUStatus() []GPUStatus {
+	deviceCount, _ := nvml.DeviceCount()
+	var statuses []GPUStatus
+	for i := 0; i < int(deviceCount); i++ {
+		device, _ := nvml.DeviceHandleByIndex(uint(i))
+		name, _ := device.Name()
+		utilization, _, _ := device.UtilizationRates()
+		memory, _, _ := device.MemoryInfo()
+		statuses = append(statuses, GPUStatus{
+			Name:        name,
+			Utilization: utilization,
+			MemoryUsage: memory,
+		})
+	}
+	return statuses
 }
 
 func displayStatus(status HardwareStatus) {
@@ -82,6 +121,7 @@ func displayStatus(status HardwareStatus) {
 	displayDiskUsage(status.DiskUsage)
 	displayNetIO(status.NetIO)
 	displayUptime(status.Uptime)
+	displayGPUStatus(status.GPUStatus)
 }
 
 func displayCPUUsage(cpuUsage []float64) {
@@ -126,6 +166,18 @@ func displayNetIO(netIO []net.IOCountersStat) {
 func displayUptime(uptime uint64) {
 	color := getColor(previousStatus.Uptime != uptime)
 	fmt.Printf("%sSystem Uptime: %d seconds%s\n", color, uptime, colorReset)
+}
+
+func displayGPUStatus(gpuStatus []GPUStatus) {
+	for i, status := range gpuStatus {
+		var prevStatus GPUStatus
+		if previousStatus.GPUStatus != nil && len(previousStatus.GPUStatus) > i {
+			prevStatus = previousStatus.GPUStatus[i]
+		}
+		colorUtilization := getColor(prevStatus.Utilization != status.Utilization)
+		colorMemory := getColor(prevStatus.MemoryUsage != status.MemoryUsage)
+		fmt.Printf("%sGPU %s - Utilization: %d%%%s, %sMemory Usage: %d bytes%s\n", colorUtilization, status.Name, status.Utilization, colorReset, colorMemory, status.MemoryUsage, colorReset)
+	}
 }
 
 func getColor(changed bool) string {
