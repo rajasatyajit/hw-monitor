@@ -1,16 +1,14 @@
 package main
 
-/*
-#cgo CFLAGS: -IC:\\PROGRA~1\\NVIDIA~2\\CUDA\\v12.5\\include
-#cgo LDFLAGS: -LC:\\PROGRA~1\\NVIDIA~2\\CUDA\\v12.5\\lib\\x64 -lnvidia-ml
-*/
-
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"log"
+	"os/exec"
+	"strings"
 	"time"
 
-	"github.com/rajasatyajit/hw-monitor/nvml"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/host"
@@ -29,8 +27,8 @@ type HardwareStatus struct {
 
 type GPUStatus struct {
 	Name        string
-	Utilization uint
-	MemoryUsage uint64
+	Utilization string
+	MemoryUsage string
 }
 
 var previousStatus HardwareStatus
@@ -54,12 +52,6 @@ const (
 )
 
 func main() {
-	err := nvml.Initialize()
-	if err != nil {
-		log.Fatalf("Could not initialize NVML: %v", err)
-	}
-	defer nvml.Shutdown()
-
 	for {
 		currentStatus := getHardwareStatus()
 
@@ -95,19 +87,30 @@ func getHardwareStatus() HardwareStatus {
 }
 
 func getGPUStatus() []GPUStatus {
-	deviceCount, _ := nvml.DeviceCount()
-	var statuses []GPUStatus
-	for i := 0; i < int(deviceCount); i++ {
-		device, _ := nvml.DeviceHandleByIndex(uint(i))
-		name, _ := device.Name()
-		utilization, _, _ := device.UtilizationRates()
-		memory, _, _ := device.MemoryInfo()
-		statuses = append(statuses, GPUStatus{
-			Name:        name,
-			Utilization: utilization,
-			MemoryUsage: memory,
-		})
+	cmd := exec.Command("nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used", "--format=csv,noheader,nounits")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("Failed to execute nvidia-smi: %v", err)
 	}
+
+	scanner := bufio.NewScanner(&out)
+	var statuses []GPUStatus
+	for scanner.Scan() {
+		fields := strings.Split(scanner.Text(), ", ")
+		if len(fields) == 3 {
+			statuses = append(statuses, GPUStatus{
+				Name:        fields[0],
+				Utilization: fields[1] + "%",
+				MemoryUsage: fields[2] + " MiB",
+			})
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		log.Fatalf("Failed to parse nvidia-smi output: %v", err)
+	}
+
 	return statuses
 }
 
@@ -176,7 +179,7 @@ func displayGPUStatus(gpuStatus []GPUStatus) {
 		}
 		colorUtilization := getColor(prevStatus.Utilization != status.Utilization)
 		colorMemory := getColor(prevStatus.MemoryUsage != status.MemoryUsage)
-		fmt.Printf("%sGPU %s - Utilization: %d%%%s, %sMemory Usage: %d bytes%s\n", colorUtilization, status.Name, status.Utilization, colorReset, colorMemory, status.MemoryUsage, colorReset)
+		fmt.Printf("%sGPU %s - Utilization: %s%s, %sMemory Usage: %s%s\n", colorUtilization, status.Name, status.Utilization, colorReset, colorMemory, status.MemoryUsage, colorReset)
 	}
 }
 

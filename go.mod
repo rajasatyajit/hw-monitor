@@ -3,7 +3,6 @@ module hw-monitor
 go 1.22.4
 
 require (
-	github.com/mindprince/gonvml v0.0.0-20211002210717-ac0b66419a41
 	github.com/shirou/gopsutil/v4 v4.24.6
 )
 
