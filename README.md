@@ -17,22 +17,24 @@ This is a Go project that monitors and displays hardware status for a laptop. Th
 
 ## Installation
 
-### 1. Clone the repository:
-
-   ```bash
+## 1. Clone the repository:
+```bash
    git clone https://github.com/rajasatyajit/hw-monitor.git
    cd hw-monitor
+   ```
  
-### 2. Initialize the Go module:
-   ``` bash
-go mod init hardware-monitor
-
-##Install dependencies:
+## 2. Initialize the Go module:
+```bash
+    go mod init hardware-monitor
+    ```
+    
+## Install dependencies:
 
 ```bash
     go get -u github.com/shirou/gopsutil/v4
+    ```
 
-##Usage
+## Usage
 
     Ensure nvidia-smi is available in your system PATH. nvidia-smi is typically installed with the NVIDIA drivers.
 
@@ -40,22 +42,23 @@ go mod init hardware-monitor
 
     Run the project:
 
-   ```bash
+```bash
     go run main.go
+    ```
 
-##How It Works
+## How It Works
 
     The program fetches hardware status using the gopsutil library and nvidia-smi for GPU metrics.
     It displays CPU usage, memory usage, disk usage, network I/O, system uptime, and GPU status.
     The display is updated every 500ms.
     Changes in hardware parameters are highlighted with a red background and white text.
 
-##Customization
+## Customization
 
     You can customize the colors by modifying the ANSI escape codes in the const section.
     You can add more hardware parameters by extending the HardwareStatus struct and modifying the getHardwareStatus and display functions.
 
-##License
+## License
 This project is licensed under the MIT License. See the LICENSE file for details.
 
 ##Contributing
